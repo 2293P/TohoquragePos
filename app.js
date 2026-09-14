@@ -18,10 +18,27 @@ function putOne(name,val){return new Promise((res,rej)=>{const r=store(name,'rea
 function delOne(name,key){return new Promise((res,rej)=>{const r=store(name,'readwrite').delete(key);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
 async function clearStore(name){return new Promise((res,rej)=>{const r=store(name,'readwrite').clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
 
-async function seed(){if((await getAll(STORES.products)).length) return; const sample=[
- {id:'SAMPLE-001',title:'新譜サンプル',artist:'とほくらげ',price:1000,stock:20,active:true,date:'2026-09-01',note:'サンプル行'},
- {id:'SAMPLE-002',title:'旧譜サンプル',artist:'とほくらげ',price:1000,stock:8,active:true,date:'2025-12-01',note:'サンプル行'}
-]; for(const p of sample) await putOne(STORES.products,p); await putOne(STORES.settings,{key:'circleName',value:'とほくらげ'}); await putOne(STORES.settings,{key:'lowStock',value:3});}
+async function seed(){
+ if(!(await getOne(STORES.settings,'circleName'))) await putOne(STORES.settings,{key:'circleName',value:'とほくらげ'});
+ if(!(await getOne(STORES.settings,'lowStock'))) await putOne(STORES.settings,{key:'lowStock',value:3});
+}
+
+async function cleanupLegacySamples(){
+ const done=await getOne(STORES.settings,'legacySampleCleanupV1');
+ if(done?.value)return;
+ const legacy=[
+  {id:'SAMPLE-001',title:'新譜サンプル',note:'サンプル行'},
+  {id:'SAMPLE-002',title:'旧譜サンプル',note:'サンプル行'}
+ ];
+ for(const x of legacy){
+  const p=await getOne(STORES.products,x.id);
+  if(p && p.title===x.title && p.note===x.note){
+   await delOne(STORES.products,x.id);
+   for(const type of ['cover','xfd','mv']) await delOne(STORES.media,`${x.id}:${type}`);
+  }
+ }
+ await putOne(STORES.settings,{key:'legacySampleCleanupV1',value:true});
+}
 
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.add('hidden'),2200)}
 async function refresh(){products=(await getAll(STORES.products)).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ja')); await renderProducts(); renderCart(); await renderAdmin(); await renderHistory();}
@@ -147,4 +164,4 @@ function bind(){
  $('#resetAll').onclick=async()=>{if(!confirm('商品・履歴・保存メディアをすべて削除します。元に戻せません。よろしいですか？'))return;for(const s of Object.values(STORES))await clearStore(s);cart.clear();await seed();await loadSettings();await refresh();toast('初期化しました');};
 }
 
-(async()=>{db=await openDB();await seed();await loadSettings();bind();await refresh();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);})();
+(async()=>{db=await openDB();await seed();await cleanupLegacySamples();await loadSettings();bind();await refresh();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);})();
