@@ -81,6 +81,31 @@ async function exportInventory(){const ps=await getAll(STORES.products);download
 async function exportSales(){const ss=await getAll(STORES.sales);downloadCsv('doujinpos_sales.csv',[['sale_line_id','sale_id','timestamp','event','payment','product_id','title','quantity','unit_price','subtotal','cancelled'],...ss.map(s=>[s.id,s.saleId,s.timestamp,s.event,s.payment,s.productId,s.title,s.quantity,s.unitPrice,s.subtotal,s.cancelled])])}
 async function exportMoves(){const ms=await getAll(STORES.moves);downloadCsv('doujinpos_stock_movements.csv',[['movement_id','timestamp','product_id','title','delta','reason','event','note','sale_id'],...ms.map(m=>[m.id,m.timestamp,m.productId,m.title,m.delta,m.reason,m.event,m.note,m.saleId])])}
 
+
+function filenameBase(name){return String(name||'').replace(/\.[^.]+$/,'').trim()}
+function mediaNameKey(s){return String(s||'').trim().toLowerCase().replace(/[\s＿_－\-]+/g,'-')}
+function matchProductForMedia(fileName){
+ const base=filenameBase(fileName);const key=mediaNameKey(base);
+ const exact=products.filter(p=>mediaNameKey(p.id)===key || mediaNameKey(p.title)===key);
+ if(exact.length===1)return exact[0];
+ const pref=products.filter(p=>{
+  const id=mediaNameKey(p.id), title=mediaNameKey(p.title);
+  return (id && (key.startsWith(id+'-'))) || (title && (key.startsWith(title+'-')));
+ });
+ return pref.length===1?pref[0]:null;
+}
+async function importBulkXfd(files){
+ let ok=0;const unmatched=[];const overwritten=[];
+ for(const file of [...files]){
+  const p=matchProductForMedia(file.name);
+  if(!p){unmatched.push(file.name);continue;}
+  const old=await getOne(STORES.media,`${p.id}:xfd`);if(old)overwritten.push(p.id);
+  await putOne(STORES.media,{id:`${p.id}:xfd`,productId:p.id,type:'xfd',name:file.name,mime:file.type,blob:file,updatedAt:nowIso()});ok++;
+ }
+ await renderAdmin();await renderProducts();
+ return {ok,unmatched,overwritten:[...new Set(overwritten)]};
+}
+
 async function renderAdmin(){
  const tb=$('#inventoryTable tbody');tb.innerHTML='';
  for(const p of products){
@@ -177,6 +202,7 @@ function bind(){
  $('#closeProductEdit').onclick=()=>$('#productEditDialog').close();$('#cancelProductEdit').onclick=()=>$('#productEditDialog').close();$('#productForm').onsubmit=saveProductForm;
  $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===t));$$('.admin-section').forEach(s=>s.classList.toggle('active',s.dataset.section===t.dataset.tab));});
  $('#inventoryCsv').onchange=async()=>{const f=$('#inventoryCsv').files?.[0];if(!f)return;try{const r=await importCsv(f);const n=$('#importResult');n.textContent=`取込完了：新規 ${r.add}件 / 更新 ${r.upd}件`;n.classList.remove('hidden');toast('在庫原票を取り込みました');await refresh();}catch(e){alert(`CSV取込エラー: ${e.message}`)}};
+ $('#bulkXfd').onchange=async()=>{const fs=$('#bulkXfd').files;if(!fs?.length)return;try{const r=await importBulkXfd(fs);const box=$('#bulkMediaResult');let msg=`一括登録：${r.ok}件`;if(r.unmatched.length)msg+=` / 未一致 ${r.unmatched.length}件：${r.unmatched.join('、')}`;if(r.overwritten.length)msg+=` / 上書き ${r.overwritten.length}商品`;box.textContent=msg;box.classList.remove('hidden');toast(`${r.ok}件のXFDを登録しました`);}catch(e){alert(`XFD一括登録エラー: ${e.message}`)}finally{$('#bulkXfd').value='';}};
  $('#downloadInventory').onclick=exportInventory;$('#downloadSales').onclick=exportSales;$('#downloadMoves').onclick=exportMoves;$('#saveSettings').onclick=saveSettings;
  $('#installHelp').onclick=()=>$('#installDialog').showModal();$('#closeInstall').onclick=()=>$('#installDialog').close();
  $('#eventName').onchange=async()=>putOne(STORES.settings,{key:'eventName',value:$('#eventName').value.trim()});

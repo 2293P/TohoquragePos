@@ -19,7 +19,7 @@
       <div class="brand-mark">DP</div>
       <div>
         <h1>DoujinPOS</h1>
-        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.3</span></div>
+        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.3.1</span></div>
       </div>
     </div>
     <div class="top-actions">
@@ -119,6 +119,11 @@
     <section class="admin-section" data-section="media">
       <h3>商品XFD・ジャケット</h3>
       <p class="help">ジャケットとXFDをiPad内のDoujinPOS領域に保存します。XFDは音声・動画のどちらでも登録でき、動画なら映像付きで再生します。Google Sheetsにはファイルを持たせません。</p>
+      <div class="action-row">
+        <label class="file-button">XFDを一括登録<input id="bulkXfd" type="file" accept="audio/*,video/*" multiple hidden /></label>
+      </div>
+      <p class="help compact-help"><strong>PCから持ってくる場合：</strong>動画ファイル名を「商品ID.mp4」または「商品ID_任意名.mp4」にしておくと、自動で商品へ紐づきます。例：<code>THKR-001_XFD.mp4</code></p>
+      <div id="bulkMediaResult" class="notice hidden"></div>
       <div id="mediaList" class="media-list"></div>
     </section>
 
@@ -220,6 +225,6 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="./app.js?v=4" defer></script>
+  <script src="./app.js?v=5" defer></script>
 </body>
 </html>

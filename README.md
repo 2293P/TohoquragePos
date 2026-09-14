@@ -84,3 +84,14 @@ PWAのService Workerは `file://` 直開きでは動かないため、このフ�
 - 音声XFDは下部プレイヤー、動画XFDは映像付きプレイヤーで再生します。
 - 既存のXFD音源はそのまま利用できます。
 - iPadではXFD欄からMP3/M4A/MP4/MOV等を選択できます。再生可否はSafariが対応するコーデックに依存します。
+
+
+## v0.3.1: PC上のXFD動画をiPadへ一括登録
+
+1. PC側でXFD動画のファイル名を `商品ID.mp4` または `商品ID_任意名.mp4` にします。
+2. 動画を iCloud Drive / OneDrive / Google Drive / USBメモリ等、iPadの「ファイル」アプリから見える場所へコピーします。
+3. iPadのDoujinPOSで在庫CSVを取り込み、商品を作成します。
+4. 管理 → XFD → **XFDを一括登録** から複数動画をまとめて選択します。
+5. ファイル名の商品IDを見て、自動で各商品へ紐づけます。
+
+PCとiPadのPWAデータベースは別です。GitHub Pagesはアプリ本体を配布するだけで、PCブラウザ内の商品やメディアはiPadへ自動同期されません。
