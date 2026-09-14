@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=2" />
   <title>DoujinPOS</title>
 </head>
 <body>
@@ -107,11 +107,13 @@
       <h3>Google Sheets → CSV取込</h3>
       <p class="help">「商品ID / タイトル / 頒布価格 / 現在庫」があれば取込できます。既存の商品IDは更新、新規IDは追加します。</p>
       <div class="action-row">
+        <button id="addProduct">＋ 商品を追加</button>
         <label class="file-button">在庫CSVを選ぶ<input id="inventoryCsv" type="file" accept=".csv,text/csv" hidden /></label>
         <button id="downloadInventory" class="ghost">現在庫CSVを書出し</button>
       </div>
       <div id="importResult" class="notice hidden"></div>
-      <div class="table-wrap"><table id="inventoryTable"><thead><tr><th>商品ID</th><th>タイトル</th><th>価格</th><th>在庫</th><th>状態</th></tr></thead><tbody></tbody></table></div>
+      <p class="help compact-help">商品をタップすると、在庫±1・在庫数指定・編集・販売停止・削除がすぐ選べます。</p>
+      <div class="table-wrap"><table id="inventoryTable"><thead><tr><th>商品ID</th><th>タイトル</th><th>価格</th><th>在庫</th><th>状態</th><th></th></tr></thead><tbody></tbody></table></div>
     </section>
 
     <section class="admin-section" data-section="media">
@@ -152,6 +154,56 @@
     </section>
   </dialog>
 
+
+  <dialog id="productActionDialog" class="action-sheet">
+    <div class="action-sheet-head">
+      <div>
+        <strong id="actionProductTitle">商品</strong>
+        <div id="actionProductMeta" class="muted"></div>
+      </div>
+      <button id="closeProductAction" class="ghost">閉じる</button>
+    </div>
+    <div class="action-sheet-stock">
+      <span>現在庫</span>
+      <strong id="actionProductStock">0</strong>
+      <span>枚</span>
+    </div>
+    <div class="quick-actions">
+      <button id="stockMinus1" class="quick-stock">−1</button>
+      <button id="stockPlus1" class="quick-stock">＋1</button>
+      <button id="setStock" class="ghost">在庫数を指定</button>
+      <button id="editProduct" class="ghost">商品情報を編集</button>
+      <button id="toggleProduct" class="ghost">販売停止</button>
+      <button id="deleteProduct" class="danger-outline">商品を削除</button>
+    </div>
+  </dialog>
+
+  <dialog id="productEditDialog" class="product-edit-dialog">
+    <form id="productForm" method="dialog">
+      <div class="dialog-head">
+        <div>
+          <strong id="productFormTitle">商品を追加</strong>
+          <div class="muted">在庫原票をその場で編集できます</div>
+        </div>
+        <button type="button" id="closeProductEdit" class="ghost">閉じる</button>
+      </div>
+      <div class="product-form-grid">
+        <label>商品ID<input id="productId" type="text" required autocomplete="off" placeholder="例 THKR-001" /></label>
+        <label>タイトル<input id="productTitle" type="text" required autocomplete="off" /></label>
+        <label>サークル・アーティスト<input id="productArtist" type="text" autocomplete="off" /></label>
+        <label>頒布価格<input id="productPrice" type="number" min="0" step="1" required inputmode="numeric" /></label>
+        <label>現在庫<input id="productStock" type="number" min="0" step="1" required inputmode="numeric" /></label>
+        <label>発行日<input id="productDate" type="date" /></label>
+        <label class="wide-check"><input id="productActive" type="checkbox" checked /> レジに表示する（有効）</label>
+        <label class="wide">備考<textarea id="productNote" rows="3"></textarea></label>
+      </div>
+      <div class="form-actions">
+        <button type="button" id="cancelProductEdit" class="ghost">キャンセル</button>
+        <button type="submit" id="saveProduct">保存</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="installDialog" class="simple-dialog">
     <div class="dialog-head">
       <strong>iPadにアプリとして追加</strong>
@@ -168,6 +220,6 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="./app.js" defer></script>
+  <script src="./app.js?v=2" defer></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 const DB_NAME='doujinpos-pwa'; const DB_VERSION=1;
 const STORES={products:'products', sales:'sales', moves:'moves', media:'media', settings:'settings'};
-let db; let products=[]; let cart=new Map(); let payment='現金'; let mediaUrls=[];
+let db; let products=[]; let cart=new Map(); let payment='現金'; let mediaUrls=[]; let selectedProductId=null; let editingProductId=null;
 const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
 const yen=n=>new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n||0));
 const nowIso=()=>new Date().toISOString();
@@ -24,7 +24,7 @@ async function seed(){if((await getAll(STORES.products)).length) return; const s
 ]; for(const p of sample) await putOne(STORES.products,p); await putOne(STORES.settings,{key:'circleName',value:'とほくらげ'}); await putOne(STORES.settings,{key:'lowStock',value:3});}
 
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.add('hidden'),2200)}
-async function refresh(){products=(await getAll(STORES.products)).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ja')); renderProducts(); renderCart(); renderAdmin(); await renderHistory();}
+async function refresh(){products=(await getAll(STORES.products)).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ja')); await renderProducts(); renderCart(); await renderAdmin(); await renderHistory();}
 
 async function coverUrl(pid){const m=await getOne(STORES.media,`${pid}:cover`);if(!m?.blob)return null;const u=URL.createObjectURL(m.blob);mediaUrls.push(u);return u}
 async function renderProducts(){for(const u of mediaUrls) URL.revokeObjectURL(u);mediaUrls=[];const low=Number((await getOne(STORES.settings,'lowStock'))?.value??3);const q=$('#searchBox').value.trim().toLowerCase();const list=products.filter(p=>p.active!==false && (!q || `${p.title} ${p.artist} ${p.id}`.toLowerCase().includes(q)));const g=$('#productGrid');g.innerHTML='';for(const p of list){const c=document.createElement('article');c.className=`product-card ${p.stock<=0?'soldout':''}`;const url=await coverUrl(p.id);c.innerHTML=`<button class="add-zone" ${p.stock<=0?'disabled':''} data-add="${esc(p.id)}"><div class="cover">${url?`<img src="${url}" alt="">`:`<div class="cover-fallback">♪</div>`}<span class="stock-badge ${p.stock<=0?'zero':p.stock<=low?'low':''}">${p.stock<=0?'完売':`残 ${p.stock}`}</span></div><div class="product-body"><div class="product-title">${esc(p.title)}</div><div class="product-meta"><span class="muted">${esc(p.artist||'')}</span><span class="price">${yen(p.price)}</span></div></button><div class="product-body"><div class="media-actions"><button data-xfd="${esc(p.id)}">▶ XFD</button><button data-mv="${esc(p.id)}">🎬 MV</button></div></div>`;g.appendChild(c)}
@@ -50,7 +50,82 @@ async function exportInventory(){const ps=await getAll(STORES.products);download
 async function exportSales(){const ss=await getAll(STORES.sales);downloadCsv('doujinpos_sales.csv',[['sale_line_id','sale_id','timestamp','event','payment','product_id','title','quantity','unit_price','subtotal','cancelled'],...ss.map(s=>[s.id,s.saleId,s.timestamp,s.event,s.payment,s.productId,s.title,s.quantity,s.unitPrice,s.subtotal,s.cancelled])])}
 async function exportMoves(){const ms=await getAll(STORES.moves);downloadCsv('doujinpos_stock_movements.csv',[['movement_id','timestamp','product_id','title','delta','reason','event','note','sale_id'],...ms.map(m=>[m.id,m.timestamp,m.productId,m.title,m.delta,m.reason,m.event,m.note,m.saleId])])}
 
-async function renderAdmin(){const tb=$('#inventoryTable tbody');tb.innerHTML='';for(const p of products){const tr=document.createElement('tr');tr.innerHTML=`<td>${esc(p.id)}</td><td>${esc(p.title)}</td><td>${yen(p.price)}</td><td>${p.stock}</td><td>${p.active===false?'停止':'有効'}</td>`;tb.appendChild(tr)}const ml=$('#mediaList');ml.innerHTML='';for(const p of products){const states={};for(const type of ['cover','xfd','mv'])states[type]=!!(await getOne(STORES.media,`${p.id}:${type}`));const row=document.createElement('div');row.className='media-row';row.innerHTML=`<div><div class="media-title">${esc(p.title)}</div><div class="muted">${esc(p.id)}</div></div>${['cover','xfd','mv'].map(type=>`<div class="media-slot ${states[type]?'ready':''}"><label>${type==='cover'?'ジャケット':type==='xfd'?'XFD音源':'MV動画'}${states[type]?' ✓':''}<input type="file" data-media="${type}" data-pid="${esc(p.id)}" accept="${type==='cover'?'image/*':type==='xfd'?'audio/*':'video/*'}"></label></div>`).join('')}`;ml.appendChild(row)}$$('[data-media]').forEach(inp=>inp.onchange=async()=>{const file=inp.files?.[0];if(!file)return;await putOne(STORES.media,{id:`${inp.dataset.pid}:${inp.dataset.media}`,productId:inp.dataset.pid,type:inp.dataset.media,name:file.name,mime:file.type,blob:file,updatedAt:nowIso()});toast(`${file.name} を保存しました`);await renderAdmin();await renderProducts();});}
+async function renderAdmin(){
+ const tb=$('#inventoryTable tbody');tb.innerHTML='';
+ for(const p of products){
+   const tr=document.createElement('tr');tr.className='inventory-row';tr.dataset.product=p.id;tr.tabIndex=0;
+   tr.innerHTML=`<td>${esc(p.id)}</td><td><strong>${esc(p.title)}</strong></td><td>${yen(p.price)}</td><td><strong>${p.stock}</strong></td><td><span class="status-pill ${p.active===false?'off':'on'}">${p.active===false?'停止':'有効'}</span></td><td class="row-more">•••</td>`;
+   tr.onclick=()=>openProductActions(p.id);tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openProductActions(p.id)}};tb.appendChild(tr)
+ }
+ const ml=$('#mediaList');ml.innerHTML='';
+ for(const p of products){const states={};for(const type of ['cover','xfd','mv'])states[type]=!!(await getOne(STORES.media,`${p.id}:${type}`));const row=document.createElement('div');row.className='media-row';row.innerHTML=`<div><div class="media-title">${esc(p.title)}</div><div class="muted">${esc(p.id)}</div></div>${['cover','xfd','mv'].map(type=>`<div class="media-slot ${states[type]?'ready':''}"><label>${type==='cover'?'ジャケット':type==='xfd'?'XFD音源':'MV動画'}${states[type]?' ✓':''}<input type="file" data-media="${type}" data-pid="${esc(p.id)}" accept="${type==='cover'?'image/*':type==='xfd'?'audio/*':'video/*'}"></label></div>`).join('')}`;ml.appendChild(row)}
+ $$('[data-media]').forEach(inp=>inp.onchange=async()=>{const file=inp.files?.[0];if(!file)return;await putOne(STORES.media,{id:`${inp.dataset.pid}:${inp.dataset.media}`,productId:inp.dataset.pid,type:inp.dataset.media,name:file.name,mime:file.type,blob:file,updatedAt:nowIso()});toast(`${file.name} を保存しました`);await renderAdmin();await renderProducts();});
+}
+
+
+async function logStockMove(p,delta,reason,note=''){
+ if(!delta)return;
+ await putOne(STORES.moves,{id:uid('move'),timestamp:nowIso(),productId:p.id,title:p.title,delta,reason,event:$('#eventName').value.trim()||'',note,saleId:''});
+}
+
+async function openProductActions(id){
+ const p=await getOne(STORES.products,id);if(!p)return;
+ selectedProductId=id;
+ $('#actionProductTitle').textContent=p.title;
+ $('#actionProductMeta').textContent=`${p.id} / ${yen(p.price)} / ${p.active===false?'販売停止':'有効'}`;
+ $('#actionProductStock').textContent=p.stock;
+ $('#toggleProduct').textContent=p.active===false?'販売を再開':'販売停止';
+ const d=$('#productActionDialog');if(!d.open)d.showModal();
+}
+
+async function adjustStock(id,delta){
+ const p=await getOne(STORES.products,id);if(!p)return;
+ const before=Number(p.stock||0);const after=Math.max(0,before+Number(delta||0));
+ if(after===before){toast('在庫はこれ以上減らせません');return;}
+ p.stock=after;await putOne(STORES.products,p);await logStockMove(p,after-before,'手動調整',`${before} → ${after}`);
+ await refresh();await openProductActions(id);toast(`在庫を ${after} 枚にしました`);
+}
+
+async function setStockDirect(id){
+ const p=await getOne(STORES.products,id);if(!p)return;
+ const raw=prompt(`${p.title} の現在庫を入力`,String(p.stock));if(raw===null)return;
+ const n=Number(String(raw).trim());if(!Number.isInteger(n)||n<0){alert('在庫は0以上の整数で入力してください');return;}
+ const before=Number(p.stock||0);if(n===before)return;p.stock=n;await putOne(STORES.products,p);await logStockMove(p,n-before,'手動調整',`在庫数指定 ${before} → ${n}`);
+ await refresh();await openProductActions(id);toast(`在庫を ${n} 枚にしました`);
+}
+
+function clearProductForm(){
+ editingProductId=null;$('#productFormTitle').textContent='商品を追加';$('#productId').value='';$('#productId').readOnly=false;$('#productTitle').value='';$('#productArtist').value=$('#circleName').value.trim()||'';$('#productPrice').value='1000';$('#productStock').value='0';$('#productDate').value='';$('#productActive').checked=true;$('#productNote').value='';
+}
+
+function openNewProductForm(){clearProductForm();const d=$('#productEditDialog');if(!d.open)d.showModal();setTimeout(()=>$('#productId').focus(),0)}
+
+async function openEditProductForm(id){
+ const p=await getOne(STORES.products,id);if(!p)return;editingProductId=id;$('#productFormTitle').textContent='商品情報を編集';$('#productId').value=p.id;$('#productId').readOnly=true;$('#productTitle').value=p.title||'';$('#productArtist').value=p.artist||'';$('#productPrice').value=Number(p.price||0);$('#productStock').value=Number(p.stock||0);$('#productDate').value=p.date||'';$('#productActive').checked=p.active!==false;$('#productNote').value=p.note||'';if($('#productActionDialog').open)$('#productActionDialog').close();const d=$('#productEditDialog');if(!d.open)d.showModal();
+}
+
+async function saveProductForm(e){
+ e.preventDefault();
+ const id=$('#productId').value.trim();const title=$('#productTitle').value.trim();const price=Number($('#productPrice').value);const stock=Number($('#productStock').value);
+ if(!id||!title){alert('商品IDとタイトルは必須です');return}if(!Number.isFinite(price)||price<0||!Number.isInteger(stock)||stock<0){alert('価格・在庫を正しく入力してください');return}
+ const existing=editingProductId?await getOne(STORES.products,editingProductId):await getOne(STORES.products,id);
+ if(!editingProductId&&existing){alert('同じ商品IDがすでにあります');return}
+ const p={id:editingProductId||id,title,artist:$('#productArtist').value.trim(),price,stock,active:$('#productActive').checked,date:$('#productDate').value,note:$('#productNote').value.trim()};
+ await putOne(STORES.products,p);
+ if(existing){const before=Number(existing.stock||0);if(before!==stock)await logStockMove(p,stock-before,'手動編集',`${before} → ${stock}`)}else if(stock!==0){await logStockMove(p,stock,'商品追加',`初期在庫 ${stock}`)}
+ $('#productEditDialog').close();await refresh();toast(existing?'商品を更新しました':'商品を追加しました');
+}
+
+async function toggleSelectedProduct(){
+ const p=await getOne(STORES.products,selectedProductId);if(!p)return;p.active=p.active===false;await putOne(STORES.products,p);await refresh();await openProductActions(p.id);toast(p.active?'販売を再開しました':'販売を停止しました');
+}
+
+async function deleteSelectedProduct(){
+ const p=await getOne(STORES.products,selectedProductId);if(!p)return;
+ if(!confirm(`「${p.title}」を商品一覧から削除しますか？\n販売履歴・在庫移動履歴は残ります。`))return;
+ await delOne(STORES.products,p.id);for(const type of ['cover','xfd','mv'])await delOne(STORES.media,`${p.id}:${type}`);cart.delete(p.id);selectedProductId=null;if($('#productActionDialog').open)$('#productActionDialog').close();await refresh();toast('商品を削除しました');
+}
+
 async function renderHistory(){const ss=(await getAll(STORES.sales)).sort((a,b)=>b.timestamp.localeCompare(a.timestamp));$('#salesCount').textContent=new Set(ss.map(s=>s.saleId)).size;$('#soldUnits').textContent=ss.reduce((a,s)=>a+Number(s.quantity||0),0);$('#salesAmount').textContent=yen(ss.reduce((a,s)=>a+Number(s.subtotal||0),0));const tb=$('#salesTable tbody');tb.innerHTML='';for(const s of ss.slice(0,200)){const tr=document.createElement('tr');tr.innerHTML=`<td>${localDate(s.timestamp)}</td><td>${esc(s.title)}</td><td>${s.quantity}</td><td>${yen(s.subtotal)}</td><td>${esc(s.payment)}</td>`;tb.appendChild(tr)}}
 
 async function loadSettings(){const c=await getOne(STORES.settings,'circleName'),l=await getOne(STORES.settings,'lowStock'),e=await getOne(STORES.settings,'eventName');if(c)$('#circleName').value=c.value;if(l)$('#lowStock').value=l.value;if(e)$('#eventName').value=e.value;}
@@ -62,6 +137,8 @@ function bind(){
  $('#closePlayer').onclick=()=>{$('#audioPlayer').pause();$('#playerBar').classList.add('hidden')};
  $('#closeVideo').onclick=()=>{$('#videoPlayer').pause();$('#videoDialog').close()};
  $('#openAdmin').onclick=()=>$('#adminDialog').showModal();$('#closeAdmin').onclick=()=>$('#adminDialog').close();
+ $('#addProduct').onclick=openNewProductForm;$('#closeProductAction').onclick=()=>$('#productActionDialog').close();$('#stockMinus1').onclick=()=>adjustStock(selectedProductId,-1);$('#stockPlus1').onclick=()=>adjustStock(selectedProductId,1);$('#setStock').onclick=()=>setStockDirect(selectedProductId);$('#editProduct').onclick=()=>openEditProductForm(selectedProductId);$('#toggleProduct').onclick=toggleSelectedProduct;$('#deleteProduct').onclick=deleteSelectedProduct;
+ $('#closeProductEdit').onclick=()=>$('#productEditDialog').close();$('#cancelProductEdit').onclick=()=>$('#productEditDialog').close();$('#productForm').onsubmit=saveProductForm;
  $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===t));$$('.admin-section').forEach(s=>s.classList.toggle('active',s.dataset.section===t.dataset.tab));});
  $('#inventoryCsv').onchange=async()=>{const f=$('#inventoryCsv').files?.[0];if(!f)return;try{const r=await importCsv(f);const n=$('#importResult');n.textContent=`取込完了：新規 ${r.add}件 / 更新 ${r.upd}件`;n.classList.remove('hidden');toast('在庫原票を取り込みました');await refresh();}catch(e){alert(`CSV取込エラー: ${e.message}`)}};
  $('#downloadInventory').onclick=exportInventory;$('#downloadSales').onclick=exportSales;$('#downloadMoves').onclick=exportMoves;$('#saveSettings').onclick=saveSettings;
