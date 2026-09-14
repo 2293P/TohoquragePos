@@ -209,7 +209,7 @@ function bind(){
  $('#resetAll').onclick=async()=>{if(!confirm('商品・履歴・保存メディアをすべて削除します。元に戻せません。よろしいですか？'))return;for(const s of Object.values(STORES))await clearStore(s);cart.clear();await seed();await loadSettings();await refresh();toast('初期化しました');};
 }
 
-const APP_VERSION='0.3.2';
+const APP_VERSION='0.3.3';
 function versionedPublicUrl(){
   const u=new URL(location.href);
   u.hash='';u.search='';u.searchParams.set('v',APP_VERSION);

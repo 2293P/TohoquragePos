@@ -97,7 +97,7 @@ PWAのService Workerは `file://` 直開きでは動かないため、このフ�
 PCとiPadのPWAデータベースは別です。GitHub Pagesはアプリ本体を配布するだけで、PCブラウザ内の商品やメディアはiPadへ自動同期されません。
 
 
-## v0.3.2: PWA更新キャッシュ対策
+## v0.3.3: PWA更新キャッシュ対策
 
 - Service Worker / JS / CSS を v6 に更新。
 - JS/CSS/画面遷移は network-first とし、GitHub Pages更新後に古い版が残りにくいよう修正。
@@ -105,4 +105,4 @@ PCとiPadのPWAデータベースは別です。GitHub Pagesはアプリ本体�
 - 管理 → 設定に「最新版を読み込む」「公開URL」を追加。
 - 最新版読み込みで削除するのはアプリシェルキャッシュだけ。IndexedDBの商品・販売履歴・XFDは保持。
 
-公開URL例: https://2293p.github.io/TohoquragePos/?v=0.3.2
+公開URL例: https://2293p.github.io/TohoquragePos/?v=0.3.3
