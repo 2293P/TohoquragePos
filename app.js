@@ -209,4 +209,28 @@ function bind(){
  $('#resetAll').onclick=async()=>{if(!confirm('商品・履歴・保存メディアをすべて削除します。元に戻せません。よろしいですか？'))return;for(const s of Object.values(STORES))await clearStore(s);cart.clear();await seed();await loadSettings();await refresh();toast('初期化しました');};
 }
 
-(async()=>{db=await openDB();await seed();await cleanupLegacySamples();await loadSettings();bind();await refresh();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);})();
+const APP_VERSION='0.3.2';
+function versionedPublicUrl(){
+  const u=new URL(location.href);
+  u.hash='';u.search='';u.searchParams.set('v',APP_VERSION);
+  return u.toString();
+}
+async function forceUpdate(){
+  try{
+    if('serviceWorker'in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.update().catch(()=>{})));
+    }
+    const keys=await caches.keys();
+    await Promise.all(keys.filter(k=>k.startsWith('doujinpos-shell-')).map(k=>caches.delete(k)));
+  }catch(e){console.warn(e)}
+  const u=new URL(location.href);u.hash='';u.search='';u.searchParams.set('v',APP_VERSION);u.searchParams.set('refresh',Date.now());location.replace(u.toString());
+}
+function bindUpdateTools(){
+  const url=versionedPublicUrl();
+  const el=$('#publicUrl');if(el)el.textContent=url;
+  const cp=$('#copyPublicUrl');if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(url);toast('URLをコピーしました')}catch{prompt('このURLをコピーしてください',url)}};
+  const fu=$('#forceUpdate');if(fu)fu.onclick=forceUpdate;
+}
+
+(async()=>{db=await openDB();await seed();await cleanupLegacySamples();await loadSettings();bind();bindUpdateTools();await refresh();if('serviceWorker'in navigator){try{const reg=await navigator.serviceWorker.register('./sw.js?v=6',{updateViaCache:'none'});reg.update().catch(()=>{});}catch(e){console.warn(e)}}})();

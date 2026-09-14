@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css?v=4" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
   <title>DoujinPOS</title>
 </head>
 <body>
@@ -19,7 +19,7 @@
       <div class="brand-mark">DP</div>
       <div>
         <h1>DoujinPOS</h1>
-        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.3.1</span></div>
+        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.3.2</span></div>
       </div>
     </div>
     <div class="top-actions">
@@ -149,7 +149,16 @@
       </div>
       <div class="action-row">
         <button id="saveSettings">設定を保存</button>
+        <button id="forceUpdate" class="ghost">最新版を読み込む</button>
         <button id="installHelp" class="ghost">iPadへの追加方法</button>
+      </div>
+      <div class="update-box">
+        <div><strong>公開URL</strong></div>
+        <code id="publicUrl">-</code>
+        <div class="action-row compact-row">
+          <button id="copyPublicUrl" class="ghost small">URLをコピー</button>
+        </div>
+        <p class="help">更新直後に古い画面が出る場合は「最新版を読み込む」を押してください。商品・販売履歴・XFDは消えません。</p>
       </div>
       <details>
         <summary>データ消去</summary>
@@ -225,6 +234,6 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="./app.js?v=5" defer></script>
+  <script src="./app.js?v=6" defer></script>
 </body>
 </html>
