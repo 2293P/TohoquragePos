@@ -2,11 +2,12 @@
 
 const DB_NAME='doujinpos-pwa'; const DB_VERSION=1;
 const STORES={products:'products', sales:'sales', moves:'moves', media:'media', settings:'settings'};
-let db; let products=[]; let cart=new Map(); let payment='現金'; let mediaUrls=[]; let selectedProductId=null; let editingProductId=null;
+let db; let products=[]; let cart=new Map(); let payment='現金'; let mediaUrls=[]; let selectedProductId=null; let editingProductId=null; let selectedSaleLineId=null;
 const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
 const yen=n=>new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n||0));
 const nowIso=()=>new Date().toISOString();
 const localDate=iso=>new Date(iso).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+const toDateTimeLocal=iso=>{const d=new Date(iso);if(Number.isNaN(d.getTime()))return '';const pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;};
 const uid=(p='id')=>`${p}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -187,7 +188,78 @@ async function deleteSelectedProduct(){
  await delOne(STORES.products,p.id);for(const type of ['cover','xfd','mv'])await delOne(STORES.media,`${p.id}:${type}`);cart.delete(p.id);selectedProductId=null;if($('#productActionDialog').open)$('#productActionDialog').close();await refresh();toast('商品を削除しました');
 }
 
-async function renderHistory(){const ss=(await getAll(STORES.sales)).sort((a,b)=>b.timestamp.localeCompare(a.timestamp));$('#salesCount').textContent=new Set(ss.map(s=>s.saleId)).size;$('#soldUnits').textContent=ss.reduce((a,s)=>a+Number(s.quantity||0),0);$('#salesAmount').textContent=yen(ss.reduce((a,s)=>a+Number(s.subtotal||0),0));const tb=$('#salesTable tbody');tb.innerHTML='';for(const s of ss.slice(0,200)){const tr=document.createElement('tr');tr.innerHTML=`<td>${localDate(s.timestamp)}</td><td>${esc(s.title)}</td><td>${s.quantity}</td><td>${yen(s.subtotal)}</td><td>${esc(s.payment)}</td>`;tb.appendChild(tr)}}
+async function renderHistory(){
+ const ss=(await getAll(STORES.sales)).sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
+ $('#salesCount').textContent=new Set(ss.map(s=>s.saleId)).size;
+ $('#soldUnits').textContent=ss.reduce((a,s)=>a+Number(s.quantity||0),0);
+ $('#salesAmount').textContent=yen(ss.reduce((a,s)=>a+Number(s.subtotal||0),0));
+ const tb=$('#salesTable tbody');tb.innerHTML='';
+ for(const s of ss.slice(0,200)){
+  const tr=document.createElement('tr');tr.className='sale-row';tr.dataset.saleLine=s.id;tr.tabIndex=0;
+  tr.innerHTML=`<td>${localDate(s.timestamp)}</td><td>${esc(s.title)}</td><td>${s.quantity}</td><td>${yen(s.subtotal)}</td><td>${esc(s.payment)}</td><td class="row-more">•••</td>`;
+  tr.onclick=()=>openSaleEditor(s.id);tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openSaleEditor(s.id)}};tb.appendChild(tr);
+ }
+}
+
+async function openSaleEditor(lineId){
+ const s=await getOne(STORES.sales,lineId);if(!s)return;selectedSaleLineId=lineId;
+ const select=$('#saleProduct');select.innerHTML='';
+ const known=new Set();
+ for(const p of products){const o=document.createElement('option');o.value=p.id;o.textContent=`${p.title} (${p.id})`;select.appendChild(o);known.add(p.id)}
+ if(!known.has(s.productId)){const o=document.createElement('option');o.value=s.productId;o.textContent=`${s.title} (${s.productId} / 商品マスタなし)`;select.prepend(o)}
+ select.value=s.productId;
+ $('#saleEditMeta').textContent=`会計ID ${s.saleId}`;
+ $('#saleQuantity').value=Number(s.quantity||1);$('#saleUnitPrice').value=Number(s.unitPrice||0);
+ $('#saleTimestamp').value=toDateTimeLocal(s.timestamp);$('#saleEvent').value=s.event||'';
+ const pay=$('#salePayment');if(![...pay.options].some(o=>o.value===s.payment)){const o=document.createElement('option');o.value=s.payment;o.textContent=s.payment;pay.appendChild(o)}pay.value=s.payment||'現金';
+ const d=$('#saleEditDialog');if(!d.open)d.showModal();
+}
+
+async function saveSaleEdit(e){
+ e.preventDefault();const s=await getOne(STORES.sales,selectedSaleLineId);if(!s)return;
+ const newProductId=$('#saleProduct').value;const newQty=Number($('#saleQuantity').value);const newPrice=Number($('#saleUnitPrice').value);
+ const rawTime=$('#saleTimestamp').value;const newTime=rawTime?new Date(rawTime).toISOString():s.timestamp;
+ const newEvent=$('#saleEvent').value.trim()||'未設定イベント';const newPayment=$('#salePayment').value||'現金';
+ if(!Number.isInteger(newQty)||newQty<1||!Number.isFinite(newPrice)||newPrice<0||!newTime){alert('数量・単価・日時を正しく入力してください');return;}
+ const oldQty=Number(s.quantity||0);const sameProduct=newProductId===s.productId;
+ const oldProduct=await getOne(STORES.products,s.productId);const newProduct=await getOne(STORES.products,newProductId);
+ if(!newProduct){alert('変更先の商品が商品マスタにありません');return;}
+ if(!sameProduct&&!oldProduct){alert('元の商品が商品マスタから削除されているため、商品変更はできません。商品を一度マスタへ戻してから訂正してください。');return;}
+ if(sameProduct){
+  const delta=oldQty-newQty;
+  if(delta<0&&Number(newProduct.stock||0)<-delta){alert('訂正後の数量に対して在庫が不足しています');return;}
+  if(delta){newProduct.stock=Number(newProduct.stock||0)+delta;await putOne(STORES.products,newProduct);await putOne(STORES.moves,{id:uid('move'),timestamp:nowIso(),productId:newProduct.id,title:newProduct.title,delta,reason:'売上訂正',event:newEvent,note:`数量 ${oldQty} → ${newQty}`,saleId:s.saleId});}
+ }else{
+  if(Number(newProduct.stock||0)<newQty){alert('変更先商品の在庫が不足しています');return;}
+  oldProduct.stock=Number(oldProduct.stock||0)+oldQty;await putOne(STORES.products,oldProduct);
+  await putOne(STORES.moves,{id:uid('move'),timestamp:nowIso(),productId:oldProduct.id,title:oldProduct.title,delta:oldQty,reason:'売上訂正',event:newEvent,note:`商品変更のため旧明細を戻し：${s.title} × ${oldQty}`,saleId:s.saleId});
+  newProduct.stock=Number(newProduct.stock||0)-newQty;await putOne(STORES.products,newProduct);
+  await putOne(STORES.moves,{id:uid('move'),timestamp:nowIso(),productId:newProduct.id,title:newProduct.title,delta:-newQty,reason:'売上訂正',event:newEvent,note:`商品変更：${newProduct.title} × ${newQty}`,saleId:s.saleId});
+ }
+ const all=await getAll(STORES.sales);const sameSale=all.filter(x=>x.saleId===s.saleId);
+ for(const line of sameSale){
+  line.timestamp=newTime;line.event=newEvent;line.payment=newPayment;
+  if(line.id===s.id){line.productId=newProduct.id;line.title=newProduct.title;line.quantity=newQty;line.unitPrice=newPrice;line.subtotal=newQty*newPrice;}
+  await putOne(STORES.sales,line);
+ }
+ $('#saleEditDialog').close();selectedSaleLineId=null;await refresh();toast('売上記録を訂正しました');
+}
+
+async function deleteSaleLine(){
+ const s=await getOne(STORES.sales,selectedSaleLineId);if(!s)return;
+ if(!confirm(`「${s.title} × ${s.quantity}」の売上明細を削除しますか？\n在庫は ${s.quantity} 枚戻します。`))return;
+ const p=await getOne(STORES.products,s.productId);
+ if(p){p.stock=Number(p.stock||0)+Number(s.quantity||0);await putOne(STORES.products,p)}
+ await putOne(STORES.moves,{id:uid('move'),timestamp:nowIso(),productId:s.productId,title:s.title,delta:Number(s.quantity||0),reason:'売上削除',event:s.event||'',note:'販売履歴から明細を削除',saleId:s.saleId});
+ await delOne(STORES.sales,s.id);$('#saleEditDialog').close();selectedSaleLineId=null;await refresh();toast('売上明細を削除し、在庫を戻しました');
+}
+
+async function deleteWholeSale(){
+ const s=await getOne(STORES.sales,selectedSaleLineId);if(!s)return;const all=await getAll(STORES.sales);const lines=all.filter(x=>x.saleId===s.saleId);const units=lines.reduce((a,x)=>a+Number(x.quantity||0),0);const amount=lines.reduce((a,x)=>a+Number(x.subtotal||0),0);
+ if(!confirm(`この会計全体（${units}点 / ${yen(amount)}）を削除しますか？\n各商品の在庫を元に戻します。`))return;
+ for(const line of lines){const p=await getOne(STORES.products,line.productId);if(p){p.stock=Number(p.stock||0)+Number(line.quantity||0);await putOne(STORES.products,p)}await putOne(STORES.moves,{id:uid('move'),timestamp:nowIso(),productId:line.productId,title:line.title,delta:Number(line.quantity||0),reason:'会計削除',event:line.event||'',note:'会計全体を販売履歴から削除',saleId:line.saleId});await delOne(STORES.sales,line.id)}
+ $('#saleEditDialog').close();selectedSaleLineId=null;await refresh();toast('会計を削除し、在庫を戻しました');
+}
 
 async function loadSettings(){const c=await getOne(STORES.settings,'circleName'),l=await getOne(STORES.settings,'lowStock'),e=await getOne(STORES.settings,'eventName');if(c)$('#circleName').value=c.value;if(l)$('#lowStock').value=l.value;if(e)$('#eventName').value=e.value;}
 async function saveSettings(){await putOne(STORES.settings,{key:'circleName',value:$('#circleName').value.trim()});await putOne(STORES.settings,{key:'lowStock',value:Number($('#lowStock').value||3)});await putOne(STORES.settings,{key:'eventName',value:$('#eventName').value.trim()});toast('設定を保存しました');await renderProducts();}
@@ -204,12 +276,13 @@ function bind(){
  $('#inventoryCsv').onchange=async()=>{const f=$('#inventoryCsv').files?.[0];if(!f)return;try{const r=await importCsv(f);const n=$('#importResult');n.textContent=`取込完了：新規 ${r.add}件 / 更新 ${r.upd}件`;n.classList.remove('hidden');toast('在庫原票を取り込みました');await refresh();}catch(e){alert(`CSV取込エラー: ${e.message}`)}};
  $('#bulkXfd').onchange=async()=>{const fs=$('#bulkXfd').files;if(!fs?.length)return;try{const r=await importBulkXfd(fs);const box=$('#bulkMediaResult');let msg=`一括登録：${r.ok}件`;if(r.unmatched.length)msg+=` / 未一致 ${r.unmatched.length}件：${r.unmatched.join('、')}`;if(r.overwritten.length)msg+=` / 上書き ${r.overwritten.length}商品`;box.textContent=msg;box.classList.remove('hidden');toast(`${r.ok}件のXFDを登録しました`);}catch(e){alert(`XFD一括登録エラー: ${e.message}`)}finally{$('#bulkXfd').value='';}};
  $('#downloadInventory').onclick=exportInventory;$('#downloadSales').onclick=exportSales;$('#downloadMoves').onclick=exportMoves;$('#saveSettings').onclick=saveSettings;
+ $('#closeSaleEdit').onclick=()=>$('#saleEditDialog').close();$('#cancelSaleEdit').onclick=()=>$('#saleEditDialog').close();$('#saleEditForm').onsubmit=saveSaleEdit;$('#deleteSaleLine').onclick=deleteSaleLine;$('#deleteWholeSale').onclick=deleteWholeSale;
  $('#installHelp').onclick=()=>$('#installDialog').showModal();$('#closeInstall').onclick=()=>$('#installDialog').close();
  $('#eventName').onchange=async()=>putOne(STORES.settings,{key:'eventName',value:$('#eventName').value.trim()});
  $('#resetAll').onclick=async()=>{if(!confirm('商品・履歴・保存メディアをすべて削除します。元に戻せません。よろしいですか？'))return;for(const s of Object.values(STORES))await clearStore(s);cart.clear();await seed();await loadSettings();await refresh();toast('初期化しました');};
 }
 
-const APP_VERSION='0.3.3';
+const APP_VERSION='0.3.4';
 function versionedPublicUrl(){
   const u=new URL(location.href);
   u.hash='';u.search='';u.searchParams.set('v',APP_VERSION);
@@ -233,4 +306,4 @@ function bindUpdateTools(){
   const fu=$('#forceUpdate');if(fu)fu.onclick=forceUpdate;
 }
 
-(async()=>{db=await openDB();await seed();await cleanupLegacySamples();await loadSettings();bind();bindUpdateTools();await refresh();if('serviceWorker'in navigator){try{const reg=await navigator.serviceWorker.register('./sw.js?v=6',{updateViaCache:'none'});reg.update().catch(()=>{});}catch(e){console.warn(e)}}})();
+(async()=>{db=await openDB();await seed();await cleanupLegacySamples();await loadSettings();bind();bindUpdateTools();await refresh();if('serviceWorker'in navigator){try{const reg=await navigator.serviceWorker.register('./sw.js?v=7',{updateViaCache:'none'});reg.update().catch(()=>{});}catch(e){console.warn(e)}}})();

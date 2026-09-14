@@ -52,3 +52,12 @@ dialog{border:0;padding:0;border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.
 .form-actions #saveProduct{background:var(--navy);color:#fff;font-weight:900}
 .form-actions .ghost{background:#fff;color:var(--ink);border-color:var(--line)}
 @media(max-width:720px){.quick-actions{grid-template-columns:1fr 1fr}.product-form-grid{grid-template-columns:1fr}.product-form-grid .wide,.product-form-grid .wide-check{grid-column:auto}}
+
+
+/* v0.3.4 editable sales history */
+.sale-row{cursor:pointer;transition:background .12s ease}.sale-row:hover,.sale-row:focus{background:#eef4fb;outline:none}.sale-row:active{background:#e4edf8}
+.sale-edit-dialog{width:min(720px,94vw);background:#fff}.sale-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+.sale-form-grid label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700}.sale-form-grid input,.sale-form-grid select{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;color:var(--ink);font:inherit}
+.sale-form-grid .wide{grid-column:1/-1}.sale-edit-help{padding:0 16px;margin:0 0 10px}.sale-danger-row{display:flex;gap:9px;flex-wrap:wrap;padding:8px 16px 14px;border-bottom:1px solid var(--line)}
+.sale-danger-row button{border-radius:10px;padding:10px 14px;font-weight:800}.form-actions #saveSaleEdit{background:var(--navy);color:#fff;font-weight:900}
+@media(max-width:720px){.sale-form-grid{grid-template-columns:1fr}.sale-form-grid .wide{grid-column:auto}.sale-danger-row{display:grid;grid-template-columns:1fr 1fr}}

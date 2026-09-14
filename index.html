@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css?v=6" />
+  <link rel="stylesheet" href="./styles.css?v=7" />
   <title>DoujinPOS</title>
 </head>
 <body>
@@ -19,7 +19,7 @@
       <div class="brand-mark">DP</div>
       <div>
         <h1>DoujinPOS</h1>
-        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.3.3</span></div>
+        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.3.4</span></div>
       </div>
     </div>
     <div class="top-actions">
@@ -138,7 +138,8 @@
         <button id="downloadSales" class="ghost">販売履歴CSV</button>
         <button id="downloadMoves" class="ghost">在庫移動CSV</button>
       </div>
-      <div class="table-wrap"><table id="salesTable"><thead><tr><th>日時</th><th>商品</th><th>数量</th><th>小計</th><th>決済</th></tr></thead><tbody></tbody></table></div>
+      <p class="help compact-help">売上行をタップすると、数量・単価・日時・イベント・決済方法を訂正できます。削除時は在庫も自動で戻します。</p>
+      <div class="table-wrap"><table id="salesTable"><thead><tr><th>日時</th><th>商品</th><th>数量</th><th>小計</th><th>決済</th><th></th></tr></thead><tbody></tbody></table></div>
     </section>
 
     <section class="admin-section" data-section="settings">
@@ -218,6 +219,36 @@
     </form>
   </dialog>
 
+
+  <dialog id="saleEditDialog" class="sale-edit-dialog">
+    <form id="saleEditForm" method="dialog">
+      <div class="dialog-head">
+        <div>
+          <strong>売上記録を編集</strong>
+          <div id="saleEditMeta" class="muted"></div>
+        </div>
+        <button type="button" id="closeSaleEdit" class="ghost">閉じる</button>
+      </div>
+      <div class="sale-form-grid">
+        <label class="wide">商品<select id="saleProduct"></select></label>
+        <label>数量<input id="saleQuantity" type="number" min="1" step="1" required inputmode="numeric" /></label>
+        <label>単価<input id="saleUnitPrice" type="number" min="0" step="1" required inputmode="numeric" /></label>
+        <label>日時<input id="saleTimestamp" type="datetime-local" required /></label>
+        <label>決済<select id="salePayment"><option value="現金">現金</option><option value="その他">その他</option></select></label>
+        <label class="wide">イベント<input id="saleEvent" type="text" autocomplete="off" /></label>
+      </div>
+      <p class="help sale-edit-help">日時・イベント・決済方法は、同じ会計に含まれる他の商品にもまとめて反映されます。数量や商品を変えた場合は在庫も自動調整します。</p>
+      <div class="sale-danger-row">
+        <button type="button" id="deleteSaleLine" class="danger-outline">この明細を削除</button>
+        <button type="button" id="deleteWholeSale" class="danger">会計全体を削除</button>
+      </div>
+      <div class="form-actions">
+        <button type="button" id="cancelSaleEdit" class="ghost">キャンセル</button>
+        <button type="submit" id="saveSaleEdit">訂正を保存</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="installDialog" class="simple-dialog">
     <div class="dialog-head">
       <strong>iPadにアプリとして追加</strong>
@@ -234,6 +265,6 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="./app.js?v=6" defer></script>
+  <script src="./app.js?v=7" defer></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "DoujinPOS - CD即売レジ",
   "short_name": "DoujinPOS",
-  "description": "同人CD向けの在庫管理・即売レジ・XFD/MV試聴PWA",
+  "description": "同人CD向けの在庫管理・即売レジ・XFD試聴PWA",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
