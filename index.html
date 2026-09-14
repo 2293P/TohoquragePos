@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css?v=3" />
+  <link rel="stylesheet" href="./styles.css?v=4" />
   <title>DoujinPOS</title>
 </head>
 <body>
@@ -19,7 +19,7 @@
       <div class="brand-mark">DP</div>
       <div>
         <h1>DoujinPOS</h1>
-        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.2.1</span></div>
+        <div class="sub">CD即売レジ・在庫・試聴 <span class="app-version">v0.3</span></div>
       </div>
     </div>
     <div class="top-actions">
@@ -69,7 +69,7 @@
       <img id="playerCover" alt="ジャケット" />
       <div class="now-text">
         <strong id="playerTitle">-</strong>
-        <span id="playerType">XFD</span>
+        <span id="playerType">XFD（音声）</span>
       </div>
     </div>
     <audio id="audioPlayer" controls preload="metadata"></audio>
@@ -79,8 +79,8 @@
   <dialog id="videoDialog" class="video-dialog">
     <div class="dialog-head">
       <div>
-        <strong id="videoTitle">MV</strong>
-        <div class="muted">ローカル動画</div>
+        <strong id="videoTitle">XFD</strong>
+        <div class="muted">XFD動画</div>
       </div>
       <button id="closeVideo" class="ghost">閉じる</button>
     </div>
@@ -91,14 +91,14 @@
     <div class="dialog-head sticky">
       <div>
         <strong>管理</strong>
-        <div class="muted">在庫原票・メディア・履歴</div>
+        <div class="muted">在庫原票・XFD・履歴</div>
       </div>
       <button id="closeAdmin" class="ghost">閉じる</button>
     </div>
 
     <div class="admin-tabs">
       <button class="tab active" data-tab="inventory">在庫原票</button>
-      <button class="tab" data-tab="media">試聴/MV</button>
+      <button class="tab" data-tab="media">XFD</button>
       <button class="tab" data-tab="history">履歴</button>
       <button class="tab" data-tab="settings">設定</button>
     </div>
@@ -117,8 +117,8 @@
     </section>
 
     <section class="admin-section" data-section="media">
-      <h3>商品メディア</h3>
-      <p class="help">ジャケット、XFD音源、MVをiPad内のDoujinPOS領域に保存します。Google Sheetsにはファイルを持たせません。</p>
+      <h3>商品XFD・ジャケット</h3>
+      <p class="help">ジャケットとXFDをiPad内のDoujinPOS領域に保存します。XFDは音声・動画のどちらでも登録でき、動画なら映像付きで再生します。Google Sheetsにはファイルを持たせません。</p>
       <div id="mediaList" class="media-list"></div>
     </section>
 
@@ -220,6 +220,6 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="./app.js?v=3" defer></script>
+  <script src="./app.js?v=4" defer></script>
 </body>
 </html>

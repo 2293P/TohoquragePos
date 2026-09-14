@@ -44,9 +44,9 @@ function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.remove('hi
 async function refresh(){products=(await getAll(STORES.products)).sort((a,b)=>String(a.id).localeCompare(String(b.id),'ja')); await renderProducts(); renderCart(); await renderAdmin(); await renderHistory();}
 
 async function coverUrl(pid){const m=await getOne(STORES.media,`${pid}:cover`);if(!m?.blob)return null;const u=URL.createObjectURL(m.blob);mediaUrls.push(u);return u}
-async function renderProducts(){for(const u of mediaUrls) URL.revokeObjectURL(u);mediaUrls=[];const low=Number((await getOne(STORES.settings,'lowStock'))?.value??3);const q=$('#searchBox').value.trim().toLowerCase();const list=products.filter(p=>p.active!==false && (!q || `${p.title} ${p.artist} ${p.id}`.toLowerCase().includes(q)));const g=$('#productGrid');g.innerHTML='';for(const p of list){const c=document.createElement('article');c.className=`product-card ${p.stock<=0?'soldout':''}`;const url=await coverUrl(p.id);c.innerHTML=`<button class="add-zone" ${p.stock<=0?'disabled':''} data-add="${esc(p.id)}"><div class="cover">${url?`<img src="${url}" alt="">`:`<div class="cover-fallback">♪</div>`}<span class="stock-badge ${p.stock<=0?'zero':p.stock<=low?'low':''}">${p.stock<=0?'完売':`残 ${p.stock}`}</span></div><div class="product-body"><div class="product-title">${esc(p.title)}</div><div class="product-meta"><span class="muted">${esc(p.artist||'')}</span><span class="price">${yen(p.price)}</span></div></button><div class="product-body"><div class="media-actions"><button data-xfd="${esc(p.id)}">▶ XFD</button><button data-mv="${esc(p.id)}">🎬 MV</button></div></div>`;g.appendChild(c)}
+async function renderProducts(){for(const u of mediaUrls) URL.revokeObjectURL(u);mediaUrls=[];const low=Number((await getOne(STORES.settings,'lowStock'))?.value??3);const q=$('#searchBox').value.trim().toLowerCase();const list=products.filter(p=>p.active!==false && (!q || `${p.title} ${p.artist} ${p.id}`.toLowerCase().includes(q)));const g=$('#productGrid');g.innerHTML='';for(const p of list){const c=document.createElement('article');c.className=`product-card ${p.stock<=0?'soldout':''}`;const url=await coverUrl(p.id);c.innerHTML=`<button class="add-zone" ${p.stock<=0?'disabled':''} data-add="${esc(p.id)}"><div class="cover">${url?`<img src="${url}" alt="">`:`<div class="cover-fallback">♪</div>`}<span class="stock-badge ${p.stock<=0?'zero':p.stock<=low?'low':''}">${p.stock<=0?'完売':`残 ${p.stock}`}</span></div><div class="product-body"><div class="product-title">${esc(p.title)}</div><div class="product-meta"><span class="muted">${esc(p.artist||'')}</span><span class="price">${yen(p.price)}</span></div></button><div class="product-body"><div class="media-actions"><button data-xfd="${esc(p.id)}">▶ XFD</button></div></div>`;g.appendChild(c)}
   $('#catalogSummary').textContent=`${list.length}作品 / 総在庫 ${list.reduce((a,p)=>a+Number(p.stock||0),0)}枚`;
-  $$('[data-add]').forEach(b=>b.onclick=()=>addCart(b.dataset.add)); $$('[data-xfd]').forEach(b=>b.onclick=()=>playXfd(b.dataset.xfd)); $$('[data-mv]').forEach(b=>b.onclick=()=>playMv(b.dataset.mv));
+  $$('[data-add]').forEach(b=>b.onclick=()=>addCart(b.dataset.add)); $$('[data-xfd]').forEach(b=>b.onclick=()=>playXfd(b.dataset.xfd));
 }
 function addCart(id){const p=products.find(x=>x.id===id);if(!p||p.stock<=0)return;const n=cart.get(id)||0;if(n>=p.stock){toast('在庫数を超えて追加できません');return;}cart.set(id,n+1);renderCart()}
 function renderCart(){const box=$('#cartItems');box.innerHTML='';let total=0,units=0;if(!cart.size){box.className='cart-items empty-state';box.textContent='商品をタップすると追加されます。'} else {box.className='cart-items';for(const [id,q] of cart){const p=products.find(x=>x.id===id);if(!p)continue;units+=q;total+=p.price*q;const line=document.createElement('div');line.className='cart-line';line.innerHTML=`<div><strong>${esc(p.title)}</strong><div class="cart-sub">${yen(p.price)} × ${q} = ${yen(p.price*q)}</div></div><div class="qty"><button data-dec="${esc(id)}">−</button><span>${q}</span><button data-inc="${esc(id)}">＋</button></div>`;box.appendChild(line)}}
@@ -54,8 +54,22 @@ function renderCart(){const box=$('#cartItems');box.innerHTML='';let total=0,uni
 
 async function checkout(){if(!cart.size)return;const event=$('#eventName').value.trim()||'未設定イベント';const saleId=uid('sale');const time=nowIso();let amount=0;for(const [id,q] of cart){const p=await getOne(STORES.products,id);if(!p||p.stock<q){toast(`${p?.title||id} の在庫が不足しています`);await refresh();return;}amount+=p.price*q;}for(const [id,q] of cart){const p=await getOne(STORES.products,id);p.stock-=q;await putOne(STORES.products,p);await putOne(STORES.sales,{id:uid('saleLine'),saleId,timestamp:time,event,payment,productId:p.id,title:p.title,quantity:q,unitPrice:p.price,subtotal:p.price*q,cancelled:false});await putOne(STORES.moves,{id:uid('move'),timestamp:time,productId:p.id,title:p.title,delta:-q,reason:'販売',event,note:'',saleId});}cart.clear();toast(`会計 ${yen(amount)} を記録しました`);await refresh();}
 
-async function playXfd(id){const p=products.find(x=>x.id===id);const m=await getOne(STORES.media,`${id}:xfd`);if(!m?.blob){toast('XFDが未登録です');return;}const u=URL.createObjectURL(m.blob);mediaUrls.push(u);$('#audioPlayer').src=u;$('#playerTitle').textContent=p?.title||id;$('#playerType').textContent='XFD';const cover=await coverUrl(id);$('#playerCover').src=cover||'./icons/icon-192.png';$('#playerBar').classList.remove('hidden');$('#audioPlayer').play().catch(()=>{});}
-async function playMv(id){const p=products.find(x=>x.id===id);const m=await getOne(STORES.media,`${id}:mv`);if(!m?.blob){toast('MVが未登録です');return;}const u=URL.createObjectURL(m.blob);mediaUrls.push(u);$('#videoPlayer').src=u;$('#videoTitle').textContent=`${p?.title||id} / MV`;$('#videoDialog').showModal();$('#videoPlayer').play().catch(()=>{});}
+async function playXfd(id){
+ const p=products.find(x=>x.id===id);const m=await getOne(STORES.media,`${id}:xfd`);
+ if(!m?.blob){toast('XFDが未登録です');return;}
+ const u=URL.createObjectURL(m.blob);mediaUrls.push(u);
+ const mime=String(m.mime||m.blob.type||'').toLowerCase();const name=String(m.name||'').toLowerCase();
+ const isVideo=mime.startsWith('video/')||/\.(mp4|m4v|mov|webm|ogv|ogg)$/.test(name);
+ if(isVideo){
+  $('#audioPlayer').pause();$('#playerBar').classList.add('hidden');
+  $('#videoPlayer').src=u;$('#videoTitle').textContent=`${p?.title||id} / XFD`;
+  const d=$('#videoDialog');if(!d.open)d.showModal();$('#videoPlayer').play().catch(()=>{});
+ }else{
+  $('#videoPlayer').pause();if($('#videoDialog').open)$('#videoDialog').close();
+  $('#audioPlayer').src=u;$('#playerTitle').textContent=p?.title||id;$('#playerType').textContent='XFD（音声）';
+  const cover=await coverUrl(id);$('#playerCover').src=cover||'./icons/icon-192.png';$('#playerBar').classList.remove('hidden');$('#audioPlayer').play().catch(()=>{});
+ }
+}
 
 function parseCSV(text){text=text.replace(/^\uFEFF/,'');const rows=[];let row=[],cell='',quote=false;for(let i=0;i<text.length;i++){const ch=text[i];if(quote){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++;}else if(ch==='"') quote=false;else cell+=ch;}else{if(ch==='"')quote=true;else if(ch===','){row.push(cell);cell='';}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell='';}else cell+=ch;}}if(cell.length||row.length){row.push(cell);rows.push(row)}return rows.filter(r=>r.some(x=>x!==''));}
 function headerIndex(h, names){for(const n of names){const i=h.findIndex(x=>String(x).trim()===n);if(i>=0)return i}return -1}
@@ -75,7 +89,12 @@ async function renderAdmin(){
    tr.onclick=()=>openProductActions(p.id);tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openProductActions(p.id)}};tb.appendChild(tr)
  }
  const ml=$('#mediaList');ml.innerHTML='';
- for(const p of products){const states={};for(const type of ['cover','xfd','mv'])states[type]=!!(await getOne(STORES.media,`${p.id}:${type}`));const row=document.createElement('div');row.className='media-row';row.innerHTML=`<div><div class="media-title">${esc(p.title)}</div><div class="muted">${esc(p.id)}</div></div>${['cover','xfd','mv'].map(type=>`<div class="media-slot ${states[type]?'ready':''}"><label>${type==='cover'?'ジャケット':type==='xfd'?'XFD音源':'MV動画'}${states[type]?' ✓':''}<input type="file" data-media="${type}" data-pid="${esc(p.id)}" accept="${type==='cover'?'image/*':type==='xfd'?'audio/*':'video/*'}"></label></div>`).join('')}`;ml.appendChild(row)}
+ for(const p of products){
+  const states={};for(const type of ['cover','xfd'])states[type]=!!(await getOne(STORES.media,`${p.id}:${type}`));
+  const row=document.createElement('div');row.className='media-row';
+  row.innerHTML=`<div><div class="media-title">${esc(p.title)}</div><div class="muted">${esc(p.id)}</div></div>${['cover','xfd'].map(type=>`<div class="media-slot ${states[type]?'ready':''}"><label>${type==='cover'?'ジャケット':'XFD（音声/動画）'}${states[type]?' ✓':''}<input type="file" data-media="${type}" data-pid="${esc(p.id)}" accept="${type==='cover'?'image/*':'audio/*,video/*'}"></label></div>`).join('')}`;
+  ml.appendChild(row)
+ }
  $$('[data-media]').forEach(inp=>inp.onchange=async()=>{const file=inp.files?.[0];if(!file)return;await putOne(STORES.media,{id:`${inp.dataset.pid}:${inp.dataset.media}`,productId:inp.dataset.pid,type:inp.dataset.media,name:file.name,mime:file.type,blob:file,updatedAt:nowIso()});toast(`${file.name} を保存しました`);await renderAdmin();await renderProducts();});
 }
 
