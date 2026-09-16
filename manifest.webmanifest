@@ -1,6 +1,6 @@
 {
-  "name": "DoujinPOS - CD即売レジ",
-  "short_name": "DoujinPOS",
+  "name": "とほくらげPOS - CD即売レジ",
+  "short_name": "とほくらげPOS",
   "description": "同人CD向けの在庫管理・即売レジ・XFD試聴PWA",
   "start_url": "./",
   "scope": "./",
